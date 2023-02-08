@@ -1,53 +1,113 @@
 pipeline {
     agent any
-
     tools {
-        maven "M3"
-        jdk "JDK11"
+        maven 'M3'
+        jdk 'JDK11'
+    }
+    parameters {
+        booleanParam(name : 'BUILD_DOCKER_IMAGE', defaultValue : true, description : 'BUILD_DOCKER_IMAGE')
+        booleanParam(name : 'RUN_TEST', defaultValue : true, description : 'RUN_TEST')
+        booleanParam(name : 'PUSH_DOCKER_IMAGE', defaultValue : true, description : 'PUSH_DOCKER_IMAGE')
+        booleanParam(name : 'PROMPT_FOR_DEPLOY', defaultValue : false, description : 'PROMPT_FOR_DEPLOY')
+        booleanParam(name : 'DEPLOY_WORKLOAD', defaultValue : true, description : 'DEPLOY_WORKLOAD')
+
+        // CI
+        string(name : 'AWS_ACCOUNT_ID', defaultValue : '257307634175', description : 'AWS_ACCOUNT_ID')
+        string(name : 'DOCKER_IMAGE_NAME', defaultValue : 'spring-petclinic', description : 'DOCKER_IMAGE_NAME')
+        string(name : 'DOCKER_TAG', defaultValue : '1.0', description : 'DOCKER_TAG')
+
+        // CD
+        string(name : 'TARGET_SVR_USER', defaultValue : 'ubuntu', description : 'TARGET_SVR_USER')
+        string(name : 'TARGET_SVR_PATH', defaultValue : '/home/ubuntu/', description : 'TARGET_SVR_PATH')
+        string(name : 'TARGET_SVR', defaultValue : '10.0.3.61', description : 'TARGET_SVR')
+    }
+
+    environment {
+        AWS_CREDENTIAL_NAME = "AWSCredentials"
+        REGION = "ap-northeast-2"
+        ECR_REPOSITORY = "${params.AWS_ACCOUNT_ID}.dkr.ecr.ap-northeast-2.amazonaws.com"
+        ECR_DOCKER_IMAGE = "${ECR_REPOSITORY}/${params.DOCKER_IMAGE_NAME}"
+        ECR_DOCKER_TAG = "${params.DOCKER_TAG}"
     }
 
     stages {
-        stage('Git Clone') {
+        stage('Git clone') {
             steps {
-                echo 'Git Clone'
-                git url: 'https://github.com/s4616/spring-petclinic.git',
-                branch: 'main', credentialsId: 'gitCredentials'
+                git url: 'https://github.com/s4616/spring-petclinic.git', branch: 'main', credentialsId: 's4616'
             }
             post {
                 success {
-                    echo 'Git Clone Success'
+                    echo 'success clone project'
                 }
                 failure {
-                    echo 'Git Clone Fail'
+                    error 'fail clone project' // exit pipeline
                 }
             }
         }
-        stage('Build') {
+        
+        stage ('mvn Build') {
             steps {
-                echo 'Build'
-                sh 'mvn -Dmaven.test.failure.ignore=true clean package'
+                sh 'mvn -Dmaven.test.failure.ignore=true install' 
             }
             post {
                 success {
-                    junit 'target/surefire-reports/**/*.xml'
+                    junit 'target/surefire-reports/**/*.xml' 
                 }
             }
         }
-        stage('Docker Image') {
+        
+        stage ('Docker Build') {
             steps {
-                echo 'Docker Image'
-            }            
-        }
-        stage('Docker Push') {
+                dir("${env.WORKSPACE}") {
+                    sh 'docker build -t ${ECR_DOCKER_IMAGE}:${ECR_DOCKER_TAG} .'
+                }
+            }
+            
+            post {
+                success {
+                    echo "Docker build success!"
+                }
+            }
+        }       
+
+        stage('Push Docker Image') {
             steps {
-                echo 'Docker Push'
-            }            
-        }
-        stage('Target Deploy') {
-            steps {
-                echo 'Target Deploy'                
-            }            
+                echo "Push Docker Image to ECR"
+                script{
+                    // cleanup current user docker credentials
+                    sh 'rm -f ~/.dockercfg ~/.docker/config.json || true'                    
+                   
+                    docker.withRegistry("https://${ECR_REPOSITORY}", "ecr:${REGION}:${AWS_CREDENTIAL_NAME}") {
+                      docker.image("${ECR_DOCKER_IMAGE}:${ECR_DOCKER_TAG}").push()
+                    }
+
+                }
+            }
+            post {
+                success {
+                    echo "Push Docker Image success!"
+                }
+            }
         }
 
+        stage('Deploy workload') {
+            steps {
+                sshagent (credentials: ['awsUserSsh']) {
+                    sh """#!/bin/bash
+                        scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
+                        deploy/docker-compose.yml \
+                        ${params.TARGET_SVR_USER}@${params.TARGET_SVR}:${params.TARGET_SVR_PATH};
+                        ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
+                        ${params.TARGET_SVR_USER}@${params.TARGET_SVR} \
+                        'aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ECR_REPOSITORY}; \
+                         export IMAGE=${ECR_DOCKER_IMAGE}; \
+                         export TAG=${ECR_DOCKER_TAG}; \
+                         docker-compose -f docker-compose.yml down;
+                         docker-compose -f docker-compose.yml up -d';
+                    """
+                }
+            }
+        }
+       
     }
 }

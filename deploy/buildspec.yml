@@ -1,0 +1,31 @@
+version: 0.2
+env:
+  variables:
+    AWS_DEFAULT_REGION: "ap-northeast-2"
+    ECR_URL: "257307634175.dkr.ecr.ap-northeast-2.amazonaws.com/spring-petclinic"
+    ECR_DOCKER_IMAGE: "spring-petclinic"
+    ECR_DOCKER_TAG: "1.0"
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
+  build:
+    on-failure: ABORT
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t ${ECR_URL}/${ECR_DOCKER_IMAGE}:${ECR_DOCKER_TAG} .
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push ${ECR_URL}/${ECR_DOCKER_IMAGE}:${ECR_DOCKER_TAG}
+artifacts:
+  files:
+    - appspec.yml
+    - scripts/kill_process.sh
+    - scripts/run_process.sh
+    - docker-compose.yml
+  discard-paths: yes
