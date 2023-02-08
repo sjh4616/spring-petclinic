@@ -1,0 +1,53 @@
+pipeline {
+    agent any
+
+    tools {
+        maven "M3"
+        jdk "JDK11"
+    }
+
+    stages {
+        stage('Git Clone') {
+            steps {
+                echo 'Git Clone'
+                git url: 'https://github.com/s4616/spring-petclinic.git',
+                branch: 'main', credentialsId: 'gitCredentials'
+            }
+            post {
+                success {
+                    echo 'Git Clone Success'
+                }
+                failure {
+                    echo 'Git Clone Fail'
+                }
+            }
+        }
+        stage('Build') {
+            steps {
+                echo 'Build'
+                sh 'mvn -Dmaven.test.failure.ignore=true clean package'
+            }
+            post {
+                success {
+                    junit 'target/surefire-reports/**/*.xml'
+                }
+            }
+        }
+        stage('Docker Image') {
+            steps {
+                echo 'Docker Image'
+            }            
+        }
+        stage('Docker Push') {
+            steps {
+                echo 'Docker Push'
+            }            
+        }
+        stage('Target Deploy') {
+            steps {
+                echo 'Target Deploy'                
+            }            
+        }
+
+    }
+}
