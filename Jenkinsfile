@@ -56,7 +56,16 @@ pipeline {
                 '''
             }
         }
-        
+
+        // Remove Docker Image
+        stage('Remove Docker Image') {
+            steps {
+                sh '''
+                docker rmi spring-petclinic:$BUILD_NUMBER
+                docker rmi s4616/spring-petclinic:latest
+                '''
+            }
+        }        
         stage('SSH Publish') {
             steps {
                 echo 'SSH Publish'
