@@ -56,17 +56,17 @@ pipeline {
                 '''
             }
         }
-
-
         
         stage('SSH Publish') {
             steps {
                 echo 'SSH Publish'
                 sshPublisher(publishers: [sshPublisherDesc(configName: 'target', 
                 transfers: [sshTransfer(cleanRemote: false, excludes: '', 
-                execCommand: '''fuser -k 8080/tcp
-                export BUILD_ID=PetClinic
-                nohup java -jar spring-petclinic-3.4.0-SNAPSHOT.jar >> nohup.out 2>&1 &''',
+                execCommand: '''
+                docker rm -f $(docker ps -aq)
+                docker rmi $(docker images -q)
+                docker run -d -p 8080:8080 --name spring-petclinic s4616/spring-petclinic:latest
+                ''',
                 execTimeout: 120000, 
                 flatten: false, 
                 makeEmptyDirs: false, 
