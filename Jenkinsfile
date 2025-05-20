@@ -67,6 +67,39 @@ pipeline {
                 docker rmi s4616/spring-petclinic:latest
                 '''
             }
-        }                
+        }    
+        stage('Upload to S3') {
+            steps {
+                echo "Upload to S3"
+                dir("${env.WORKSPACE}") {
+                    sh 'zip -r deploy.zip ./deploy appspec.yml'
+                    withAWS(region:"${REGION}", credentials:"${AWS_CREDENTIAL_NAME}"){
+                      s3Upload(file:"deploy.zip", bucket:"user00-codedeploy-bucket")
+                    } 
+                    sh 'rm -rf ./deploy.zip'                 
+                }        
+            }
+        }
+        stage('Codedeploy Workload') {
+            steps {
+               echo "create Codedeploy group"   
+                sh '''
+                    aws deploy create-deployment-group \
+                    --application-name user00-code-deploy \
+                    --auto-scaling-groups user00-asg \
+                    --deployment-group-name user00-code-deploy-${BUILD_NUMBER} \
+                    --deployment-config-name CodeDeployDefault.OneAtATime \
+                    --service-role-arn arn:aws:iam::257307634175:role/user00-codedeploy-service-role
+                    '''
+                echo "Codedeploy Workload"   
+                sh '''
+                    aws deploy create-deployment --application-name user00-code-deploy \
+                    --deployment-config-name CodeDeployDefault.OneAtATime \
+                    --deployment-group-name user00-code-deploy-${BUILD_NUMBER} \
+                    --s3-location bucket=user00-codedeploy-bucket,bundleType=zip,key=deploy.zip
+                    '''
+                    sleep(10) // sleep 10s
+            }
+        }            
     }
 }
