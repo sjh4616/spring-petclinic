@@ -72,9 +72,9 @@ pipeline {
             steps {
                 echo "Upload to S3"
                 dir("${env.WORKSPACE}") {
-                    sh 'zip -r deploy.zip ./deploy appspec.yml'
+                    sh 'zip -r scripts.zip ./scripts appspec.yml'
                     withAWS(region:"${REGION}", credentials:"${AWS_CREDENTIAL_NAME}"){
-                      s3Upload(file:"deploy.zip", bucket:"user00-codedeploy-bucket")
+                      s3Upload(file:"scripts.zip", bucket:"user00-codedeploy-bucket")
                     } 
                     sh 'rm -rf ./deploy.zip'                 
                 }        
@@ -96,7 +96,7 @@ pipeline {
                     aws deploy create-deployment --application-name user00-code-deploy \
                     --deployment-config-name CodeDeployDefault.OneAtATime \
                     --deployment-group-name user00-code-deploy-${BUILD_NUMBER} \
-                    --s3-location bucket=user00-codedeploy-bucket,bundleType=zip,key=deploy.zip
+                    --s3-location bucket=user00-codedeploy-bucket,bundleType=zip,key=scripts.zip
                     '''
                     sleep(10) // sleep 10s
             }
