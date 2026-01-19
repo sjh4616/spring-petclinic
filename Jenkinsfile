@@ -27,7 +27,26 @@ pipeline {
         }
       }
     }
-      
+    // Docker Image 생성
+    stage('Docker Image Build') {
+      steps {
+        echo 'Docker Image Build'
+      }
+    }
+
+    // Docker Image Upload
+    stage('Docker Image Upload') {
+      steps {
+        echo 'Docker Image Upload'
+      }
+    }
+
+    // Target로 *.jar 전송
+    stage('SSH Publish') {
+      steps {
+        echo 'SSH Publish'
+      }
+    }      
       
   }  
 }
