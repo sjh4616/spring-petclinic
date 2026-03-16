@@ -80,8 +80,9 @@ pipeline {
 
     // Code Deploy
     stage('Codedeploy Workload') {
-      steps {
-        sh '''
+      steps {        
+        withAWS(region:"${REGION}", credentials:"${AWS_CREDENTIALS_NAME}") {
+          sh '''
            aws deploy create-deployment-group \
            --application-name user00-code-deploy \
            --auto-scaling-groups USER00-ASG-TARGET \
@@ -89,12 +90,13 @@ pipeline {
            --deployment-config-name CodeDeployDefault.OneAtATime \
            --service-role-arn arn:aws:iam::491085389788:role/user00-code-deploy-service-role
            '''
-        sh '''
+         sh '''
            aws deploy create-deployment --application-name user00-code-deploy \
            --deployment-config-name CodeDeployDefault.OneAtATime \
            --deployment-group-name user00-code-deploy-${BUILD_NUMBER} \
            --s3-location bucket=user00-codedeploy-bucket,bundleType=zip,key=scripts.zip
            '''
+        }
         sleep(10) // sleep 10s
       }
     }
