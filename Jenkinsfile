@@ -68,7 +68,7 @@ pipeline {
     stage('Upload to S3') {
       steps {
         echo 'Upload to S3'
-        dir("$(env.WORKSPACE)") {
+        dir("${env.WORKSPACE}") {
             sh 'zip -r scripts.zip ./scripts appspec.yml'
             withAWS(region:"${REGION}", credentials:"${AWS_CREDENTIALS_NAME}") {
               s3Upload(file:"scripts.zip", bucket:"user00-codedeploy-bucket")
