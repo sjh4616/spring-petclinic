@@ -8,7 +8,7 @@ pipeline {
   environment {
     REGION = "ap-northeast-2"
     DOCKERHUB_CREDENTIALS = credentials('DockerCredentials')
-    AWS_CREDENTIALS_NAME = credentials('AWSCredentials')
+    AWS_CREDENTIALS_NAME = "AWSCredentials"
   }
 
   stages {
